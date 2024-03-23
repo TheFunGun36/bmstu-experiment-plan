@@ -83,18 +83,19 @@ export function startModel(p: ModelProps) {
   const getSvc = () => gaussian.ppf(Math.random());
 
   let eventQueue: number[] = [];
+  const genTime = getGen();
 
   const units: Unit[] = [
     {
       type: 'generator',
       distribution: getGen,
-      lastEvent: 0,
+      lastEvent: genTime,
       requestsGenerated: 0
     },
     {
       type: 'service',
       distribution: getSvc,
-      lastEvent: 0,
+      lastEvent: genTime + getSvc(),
       requestsHandled: 0,
       busyTime: 0
     }
@@ -123,13 +124,13 @@ export function startModel(p: ModelProps) {
         const gen = minGen(units) as Generator;
         unit.lastEvent = gen.lastEvent + t;
 
-        res.requestsTotal++;
-        gen.requestsGenerated++;
-        eventQueue.push(gen.lastEvent);
-        gen.lastEvent += gen.distribution();
+        //res.requestsTotal++;
+        //gen.requestsGenerated++;
+        //eventQueue.push(gen.lastEvent);
+        //gen.lastEvent += gen.distribution();
       }
     }
-    
+
     unit = minUnit(units);
   }
 

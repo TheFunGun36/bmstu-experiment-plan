@@ -4,6 +4,10 @@ import React, { useState } from 'react';
 import { ModelResult, startModel } from './model/Model';
 import { theme } from './theme';
 
+const grd = 10;
+const step = 1;
+const perPoint = 100;
+
 function App() {
   const [model, setModel] = useState<ModelResult | null>(null);
 
@@ -35,10 +39,18 @@ function App() {
   const svcParamToIntensity = (mean: number) => 1 / mean;
   const svcIntensityToParam = (i: number) => 1 / i;
 
-  const x = model ? Array(20).fill(0).map((_, i) => serviceIntensity + i) : [];
-  const [modelSeries, setModelSeries] = useState<ModelResult[]>([]);
-  const y = modelSeries.map(v => v.queueTimeAverage);
 
+  const xSvcI = Array(grd).fill(0).map((_, i) => 1 + (i + 1) * step);
+  const xSvcG = grd * step;
+  const xGenI = Array(grd).fill(0).map((_, i) => 1 + (i + 1) * step);
+  const xGenG = step;
+  const xCoefI = Array(grd).fill(0).map((_, i) => (i + 1) / grd);
+  const xCoefI2 = Array(grd).fill(0).map((_, i) => (i + 1) / grd);
+
+  const [ySvc, setYSvc] = useState<number[]>([]);
+  const [yGen, setYGen] = useState<number[]>([]);
+  const [yCoef, setYCoef] = useState<number[]>([]);
+  const [yCoef2, setYCoef2] = useState<number[]>([]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -177,7 +189,8 @@ function App() {
                 <TextField label='Число обработанных заявок' variant='standard' aria-readonly value={model.requestsHandled} />
                 <TextField label='Число небработанных заявок (размер очереди)' variant='standard' aria-readonly value={model.queueSize} />
                 <TextField label='Среднее время ожидания в очереди' variant='standard' aria-readonly value={model.queueTimeAverage} />
-                <TextField label='Коэффициент загрузки ОА' variant='standard' aria-readonly value={model.busyTime / model.modelTime} />
+                <TextField label='Загрузка ОА (практический)' variant='standard' aria-readonly value={model.busyTime / model.modelTime} />
+                <TextField label='Загрузка ОА (теоретический)' variant='standard' aria-readonly value={sourceIntensity / serviceIntensity} />
               </Card>
             </Paper>}
         </Box>
@@ -186,25 +199,119 @@ function App() {
           variant='contained'
           sx={{ m: 'auto' }}
           onClick={() => {
+            console.log('click!');
             setModel(startModel({ modelTime, serviceMean, serviceSigma, sourceSigma }));
 
-            setModelSeries(Array(20).fill(0).map((_, i) =>
-              startModel({ modelTime, serviceMean: svcIntensityToParam(serviceIntensity + i), serviceSigma, sourceSigma })
-            ));
+            const ySvcRes = Array(xSvcI.length);
+            for (let i = 0; i < xSvcI.length; i++) {
+              let sum = 0;
+              const params = { modelTime, serviceMean: svcIntensityToParam(xSvcI[i]), serviceSigma, sourceSigma: srcIntensityToParam(xGenG) };
+              for (let j = 0; j < perPoint; j++)
+                sum += startModel(params).queueTimeAverage;
+              ySvcRes[i] = sum / perPoint;
+              console.log('iteration 1');
+            }
+            console.log('finished 1');
+
+            const yGenRes = Array(xGenI.length);
+            for (let i = 0; i < xGenI.length; i++) {
+              let sum = 0;
+              const params = { modelTime, serviceMean: srcIntensityToParam(xSvcG), serviceSigma, sourceSigma: srcIntensityToParam(xGenI[i]) };
+              for (let j = 0; j < perPoint; j++)
+                sum += startModel(params).queueTimeAverage;
+              yGenRes[i] = sum / perPoint;
+              console.log('iteration 2');
+            }
+            console.log('finished 2');
+
+            const yCoefRes = Array(xCoefI.length);
+            for (let i = 0; i < xCoefI.length; i++) {
+              let sum = 0;
+              const svcMean = svcIntensityToParam(xSvcG);
+              const srcSigma = srcIntensityToParam(xSvcG * xCoefI[i]);
+              const params = { modelTime, serviceMean: svcMean, serviceSigma, sourceSigma: srcSigma };
+              for (let j = 0; j < perPoint * 100; j++)
+                sum += startModel(params).queueTimeAverage;
+              yCoefRes[i] = sum / perPoint;
+              console.log('iteration 3');
+            }
+            console.log('finished 3');
+
+            // const yCoefRes2 = Array(xCoefI2.length);
+            // for (let i = 0; i < xCoefI2.length; i++) {
+            //   let sum = 0;
+            //   const svcMean = svcIntensityToParam(xGenG * xCoefI2[i]);
+            //   const srcSigma = srcIntensityToParam(xGenG);
+            //   const params = { modelTime, serviceMean: svcMean, serviceSigma, sourceSigma: srcSigma };
+            //   for (let j = 0; j < perPoint; j++)
+            //     sum += startModel(params).queueTimeAverage;
+            //   yCoefRes2[i] = sum / perPoint;
+            //   console.log('iteration 4');
+            // }
+            // console.log('finished 4');
+
+            setYSvc(ySvcRes);
+            setYGen(yGenRes);
+            setYCoef(yCoefRes);
+            //setYCoef2(yCoefRes2);
           }}>
           Моделировать!
         </Button>
-        <LineChart
-          sx={{ m: 'auto' }}
-          xAxis={[{ data: x }]}
-          series={[
-            {
-              data: y,
-            },
-          ]}
-          width={500}
-          height={300}
-        />
+        <Box display='flex' flexDirection='column'>
+          <LineChart
+            sx={{ m: 'auto', mt: 4 }}
+            xAxis={[{ data: xSvcI, label: 'Интенсивность ОА' }]}
+            title='Зависимость среднего времени ожидания от интенсивности ОА'
+            series={[
+              {
+                data: ySvc,
+                label: `Среднее время ожидания (инт. ИЗ: ${xGenG})`
+              },
+            ]}
+            width={1000}
+            height={300}
+          />
+          <LineChart
+            sx={{ m: 'auto', mt: 4 }}
+            xAxis={[{ data: xGenI, label: 'Интенсивность ИЗ' }]}
+            title='Зависимость среднего времени ожидания от интенсивности ИЗ'
+            series={[
+              {
+                data: yGen,
+                label: `Среднее время ожидания (инт. ОА: ${xSvcG})`
+              },
+            ]}
+            width={1000}
+            height={300}
+          />
+          <LineChart
+            sx={{ m: 'auto', mt: 4 }}
+            xAxis={[{ data: [0].concat(...xCoefI), label: 'Загрузка ОА' }]}
+            title='Зависимость среднего времени ожидания от загрузки ОА'
+            series={[
+              {
+                data: [0].concat(...yCoef),
+                label: `Среднее время ожидания (инт. ИЗ: ${xGenG})`
+              },
+            ]}
+            width={1000}
+            height={300}
+          />
+
+          {/* <LineChart
+            sx={{ m: 'auto', mt: 4 }}
+            xAxis={[{ data: xCoefI2, label: 'Загрузка ОА' }]}
+            title='Зависимость среднего времени ожидания от загрузки ОА'
+            series={[
+              {
+                data: yCoef2,
+                label: `Среднее время ожидания (инт. ОА: ${xSvcG})`
+              },
+            ]}
+            width={1000}
+            height={300}
+          /> */}
+        </Box>
       </Box>
     </ThemeProvider>
   );
