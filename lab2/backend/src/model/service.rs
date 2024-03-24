@@ -1,4 +1,6 @@
-use super::Time;
+use std::{cell::RefCell, rc::Rc};
+
+use super::{SharedService, Time};
 use rand_distr::{Distribution, LogNormal};
 
 pub trait Service {
@@ -6,6 +8,8 @@ pub trait Service {
     fn last_event(&self) -> Time;
     fn next_event(&self) -> Time;
     fn advance(&mut self, time_override: Option<Time>);
+    fn dyn_clone(&self) -> SharedService;
+    fn reset(&mut self);
 }
 
 pub struct NormalService {
@@ -20,8 +24,30 @@ impl NormalService {
         self.distribution.sample(&mut rand::thread_rng())
     }
 
+    fn actual_mu(m: f64, s: f64) -> f64 {
+        f64::ln(m) - s * s / 2.0
+    }
+
+    fn actual_sigma (m: f64, s: f64) -> f64 {
+        f64::sqrt(
+            f64::ln(
+            0.5 *
+            f64::exp(-2.0 * m) *
+            (
+                f64::sqrt(
+                    4.0 * f64::exp(2.0 * m) * s +
+                    f64::exp(4.0 * m)
+                ) +
+                f64::exp(2.0 * m)
+            )
+            )
+        )
+    }
+
     pub fn new(mu: f64, sigma: f64) -> Self {
-        let distribution = LogNormal::new(mu, sigma).unwrap();
+        let s = Self::actual_sigma(mu, sigma);
+        let m = Self::actual_mu(mu, s);
+        let distribution = LogNormal::new(m, s).unwrap();
         let last_event = 0.0;
         let next_event = 0.0;
         Self {
@@ -54,5 +80,20 @@ impl Service for NormalService {
             self.next_event
         };
         self.next_event = self.last_event + self.distribution_sample();
+    }
+
+    fn dyn_clone(&self) -> SharedService {
+        Rc::new(RefCell::new(Self {
+            busy_time: self.busy_time,
+            distribution: self.distribution.clone(),
+            last_event: self.last_event,
+            next_event: self.next_event
+        }))
+    }
+
+    fn reset(&mut self) {
+        self.last_event = 0.0;
+        self.next_event = 0.0;
+        self.busy_time = 0.0;
     }
 }

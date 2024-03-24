@@ -17,6 +17,17 @@ pub struct Model {
     params: ModelParams,
 }
 
+impl Clone for Model {
+    fn clone(&self) -> Self {
+        Self {
+            generators: self.generators.iter().map(|v| v.borrow().dyn_clone()).collect(),
+            services: self.services.iter().map(|v| v.borrow().dyn_clone()).collect(),
+            params: self.params.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ModelParams {
     pub model_time: Time,
 }
@@ -33,7 +44,7 @@ impl Model {
         Self {
             generators: Vec::<SharedGenerator>::new(),
             services: Vec::<SharedService>::new(),
-            params
+            params,
         }
     }
 
@@ -43,6 +54,11 @@ impl Model {
 
     pub fn add_generator(&mut self, svc: SharedGenerator) {
         self.generators.push(svc);
+    }
+
+    pub fn reset(&mut self) {
+        self.generators.iter().for_each(|el| el.borrow_mut().reset());
+        self.services.iter().for_each(|el| el.borrow_mut().reset());
     }
 
     pub fn start(&self) -> ModelResult {

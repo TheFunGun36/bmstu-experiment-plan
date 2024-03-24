@@ -1,10 +1,13 @@
+use std::{cell::RefCell, rc::Rc};
 use rand::random;
-use super::Time;
+use super::{SharedGenerator, Time};
 
 pub trait Generator {
     fn last_event(&self) -> Time;
     fn next_event(&self) -> Time;
     fn advance(&mut self, time_override: Option<Time>);
+    fn dyn_clone(&self) -> SharedGenerator;
+    fn reset(&mut self);
 }
 
 pub struct RayleighGenerator {
@@ -43,6 +46,19 @@ impl Generator for RayleighGenerator {
         } else {
             self.next_event
         };
+        self.next_event = self.last_event + Self::rayleigh_sample(self.sigma);
+    }
+
+    fn dyn_clone(&self) -> SharedGenerator {
+        Rc::new(RefCell::new(Self {
+            last_event: self.last_event,
+            next_event: self.next_event,
+            sigma: self.sigma
+        }))
+    }
+
+    fn reset(&mut self) {
+        self.last_event = Self::rayleigh_sample(self.sigma);
         self.next_event = self.last_event + Self::rayleigh_sample(self.sigma);
     }
 }
