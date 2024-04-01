@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.7.4", features = ["macros"] }
 futures = "0.3.30"
+ndarray = { version = "0.15.6", features = ["blas"] }
+ndarray-linalg = { version = "0.16.0", features = ["intel-mkl-static"]}
 rand = "0.8.5"
 rand_distr = "0.4.3"
 serde = { version = "1.0.197", features = ["derive"] }

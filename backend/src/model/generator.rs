@@ -1,6 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
-use rand::random;
 use super::{SharedGenerator, Time};
+use rand::random;
+use std::{cell::RefCell, f64::consts::PI, rc::Rc};
 
 pub trait Generator {
     fn last_event(&self) -> Time;
@@ -13,7 +13,7 @@ pub trait Generator {
 pub struct RayleighGenerator {
     last_event: Time,
     next_event: Time,
-    sigma: f64
+    sigma: f64,
 }
 
 impl RayleighGenerator {
@@ -26,8 +26,28 @@ impl RayleighGenerator {
         Self {
             last_event,
             next_event: last_event + Self::rayleigh_sample(sigma),
-            sigma
+            sigma,
         }
+    }
+
+    pub fn new_shared(sigma: f64) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(sigma)))
+    }
+
+    fn i2p(i: f64) -> f64 {
+        1.0 / (f64::sqrt(PI / 2.0) * i)
+    }
+
+    fn p2i(sigma: f64) -> f64 {
+        1.0 / (f64::sqrt(PI / 2.0) * sigma)
+    }
+
+    pub fn from_intensity(intensity: f64) -> Self {
+        Self::new(Self::i2p(intensity))
+    }
+
+    pub fn shared_from_intensity(intensity: f64) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::from_intensity(intensity)))
     }
 }
 
@@ -53,7 +73,7 @@ impl Generator for RayleighGenerator {
         Rc::new(RefCell::new(Self {
             last_event: self.last_event,
             next_event: self.next_event,
-            sigma: self.sigma
+            sigma: self.sigma,
         }))
     }
 

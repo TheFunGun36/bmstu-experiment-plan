@@ -1,6 +1,8 @@
 import axios from "axios";
 import { useState } from "react";
 
+axios.defaults.baseURL = 'http://localhost:3000'
+
 export enum FetchState {
     DEFAULT = 'DEFAULT',
     LOADING = 'LOADING',
@@ -8,32 +10,61 @@ export enum FetchState {
     ERROR = 'ERROR'
 }
 
-export type ModelParamsDTO = {
-    generator_sigma: number,
-    service_sigma: number,
-    service_mean: number,
-    model_time: number
+export type ExperimentParamsDTO = {
+    model_time: number,
+    iterations: number,
+    svc_intensity_begin: number,
+    svc_intensity_end: number,
+    svc_sigma_begin: number,
+    svc_sigma_end: number,
+    gen_intensity_begin: number,
+    gen_intensity_end: number,
 }
 
-export type ModelResultDTO = {
-    request_total: number,
-    requests_handled: number,
-    requests_in_queue: number,
-    queue_time_avg: number,
-    load_avg: number
+export type ExperimentParamsSingleDTO = {
+    model_time: number,
+    iterations: number,
+    svc_intensity_point: number,
+    svc_intensity_begin: number,
+    svc_intensity_end: number,
+    svc_sigma_point: number,
+    svc_sigma_begin: number,
+    svc_sigma_end: number,
+    gen_intensity_point: number,
+    gen_intensity_begin: number,
+    gen_intensity_end: number,
+    b: number[]
 }
 
-axios.defaults.baseURL = 'http://localhost:3000'
+export type ExperimentRecord = {
+    x0: number,
+    x1: number,
+    x2: number,
+    x3: number,
+    x12: number,
+    x13: number,
+    x23: number,
+    x123: number,
+    y: number,
+    yl: number,
+    yn: number,
+    yld: number,
+    ynd: number,
+}
 
-export function useModel(): [FetchState, ModelResultDTO | undefined, (p: ModelParamsDTO) => Promise<void>] {
+export type ExperimentResultDTO = {
+    matrix: ExperimentRecord[],
+    b: number[]
+}
+export function useActiveExperiment(): [FetchState, ExperimentResultDTO | undefined, (p: ExperimentParamsDTO) => Promise<void>] {
     const [fetchState, setFetchState] = useState(FetchState.DEFAULT);
-    const [fetchResult, setFetchResult] = useState<ModelResultDTO>();
+    const [fetchResult, setFetchResult] = useState<ExperimentResultDTO>();
 
-    const getModelResult = async (p: ModelParamsDTO) => {
+    const getModelResult = async (p: ExperimentParamsDTO) => {
         setFetchState(FetchState.LOADING);
-        const response = await axios.post('/model', p);
+        const response = await axios.post('/model/experiment', p);
         if (response.status == 200) {
-            setFetchResult(response.data as ModelResultDTO);
+            setFetchResult(response.data as ExperimentResultDTO);
             setFetchState(FetchState.SUCCESS);
         }
         else {
@@ -44,60 +75,15 @@ export function useModel(): [FetchState, ModelResultDTO | undefined, (p: ModelPa
     return [fetchState, fetchResult, getModelResult];
 }
 
-export type SvcSpreadDTO = {
-    queue_time_spread: number[],
-    load_spread: number[]
-}
-
-export type SvcSpreadParamsDTO = {
-    iteration_per_point: number,
-    generator_sigma: number,
-    service_sigma: number,
-    service_mean_spread: number[],
-    model_time: number,
-}
-
-export function useSvcSpread(): [FetchState, SvcSpreadDTO | undefined, (p: SvcSpreadParamsDTO) => Promise<void>] {
+export function useActiveSingle(): [FetchState, ExperimentRecord | undefined, (p: ExperimentParamsSingleDTO) => Promise<void>] {
     const [fetchState, setFetchState] = useState(FetchState.DEFAULT);
-    const [fetchResult, setFetchResult] = useState<SvcSpreadDTO>();
+    const [fetchResult, setFetchResult] = useState<ExperimentRecord>();
 
-    const getModelResult = async (p: SvcSpreadParamsDTO) => {
+    const getModelResult = async (p: ExperimentParamsSingleDTO) => {
         setFetchState(FetchState.LOADING);
-        const response = await axios.post('/model/service_spread', p);
+        const response = await axios.post('/model/experiment_single', p);
         if (response.status == 200) {
-            setFetchResult(response.data as SvcSpreadDTO);
-            setFetchState(FetchState.SUCCESS);
-        }
-        else {
-            setFetchState(FetchState.ERROR);
-        }
-    }
-
-    return [fetchState, fetchResult, getModelResult];
-}
-
-export type GenSpreadDTO = {
-    queue_time_spread: number[],
-    load_spread: number[]
-}
-
-export type GenSpreadParamsDTO = {
-    iteration_per_point: number,
-    generator_sigma_spread: number[],
-    service_sigma: number,
-    service_mean: number,
-    model_time: number,
-}
-
-export function useGenSpread(): [FetchState, GenSpreadDTO | undefined, (p: GenSpreadParamsDTO) => Promise<void>] {
-    const [fetchState, setFetchState] = useState(FetchState.DEFAULT);
-    const [fetchResult, setFetchResult] = useState<GenSpreadDTO>();
-
-    const getModelResult = async (p: GenSpreadParamsDTO) => {
-        setFetchState(FetchState.LOADING);
-        const response = await axios.post('/model/generator_spread', p);
-        if (response.status == 200) {
-            setFetchResult(response.data as GenSpreadDTO);
+            setFetchResult(response.data as ExperimentRecord);
             setFetchState(FetchState.SUCCESS);
         }
         else {

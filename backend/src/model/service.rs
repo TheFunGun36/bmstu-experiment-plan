@@ -57,6 +57,22 @@ impl NormalService {
             distribution,
         }
     }
+
+    pub fn new_shared(mu: f64, sigma: f64) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(mu, sigma)))
+    }
+
+    pub fn i2p(i: f64) -> f64 {
+        1.0 / i
+    }
+
+    pub fn from_intensity(i: f64, sigma: f64) -> Self {
+        Self::new(Self::i2p(i), sigma)
+    }
+
+    pub fn shared_from_intensity(i: f64, sigma: f64) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::from_intensity(i, sigma)))
+    }
 }
 
 impl Service for NormalService {
